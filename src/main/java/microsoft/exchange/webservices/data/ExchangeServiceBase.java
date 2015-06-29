@@ -36,6 +36,7 @@ import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.impl.conn.BasicHttpClientConnectionManager;
 
+import javax.net.ssl.SSLContext;
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamWriter;
 
@@ -164,6 +165,27 @@ public abstract class ExchangeServiceBase implements Closeable {
     this();
     this.requestedServerVersion = requestedServerVersion;
   }
+  
+ protected ExchangeServiceBase(SSLContext sslContext) {
+		setUseDefaultCredentials(true);
+		if(sslContext!=null){
+			System.out.println("**using edp keystore**");
+			initializeHttpClient(sslContext);
+			
+		}else{
+			System.out.println("**using JVM keystore**");
+			initializeHttpClient();	
+		}
+		
+		initializeHttpContext();
+
+	}
+  
+  protected ExchangeServiceBase(ExchangeVersion requestedServerVersion,SSLContext sslContext) {
+	    this(sslContext);
+	    this.requestedServerVersion = requestedServerVersion;
+	  }
+
 
   protected ExchangeServiceBase(ExchangeServiceBase service, ExchangeVersion requestedServerVersion) {
     this(requestedServerVersion);
@@ -179,17 +201,11 @@ public abstract class ExchangeServiceBase implements Closeable {
     this.httpHeaders = service.getHttpHeaders();
   }
 
-  private void initializeHttpClient() {
+  private void initializeHttpClient(SSLContext sslContext) {
     EwsSSLProtocolSocketFactory factory;
-    try {
-      factory = EwsSSLProtocolSocketFactory.build(null);
-    } catch (NoSuchAlgorithmException e) {
-      throw new RuntimeException("Could not initialize HttpClientConnectionManager.", e);
-    } catch (KeyStoreException e) {
-      throw new RuntimeException("Could not initialize HttpClientConnectionManager.", e);
-    } catch (KeyManagementException e) {
-      throw new RuntimeException("Could not initialize HttpClientConnectionManager.", e);
-    }
+    
+    factory = new EwsSSLProtocolSocketFactory(sslContext);
+   
 
     Registry<ConnectionSocketFactory> registry = RegistryBuilder.<ConnectionSocketFactory>create()
         .register("http", new PlainConnectionSocketFactory())
@@ -201,6 +217,30 @@ public abstract class ExchangeServiceBase implements Closeable {
         .setTargetAuthenticationStrategy(new CookieProcessingTargetAuthenticationStrategy());
     httpClient = httpClientBuilder.build();
   }
+  
+  private void initializeHttpClient() {
+	    EwsSSLProtocolSocketFactory factory;
+	    try {
+	      factory = EwsSSLProtocolSocketFactory.build(null);
+	    } catch (NoSuchAlgorithmException e) {
+	      throw new RuntimeException("Could not initialize HttpClientConnectionManager.", e);
+	    } catch (KeyStoreException e) {
+	      throw new RuntimeException("Could not initialize HttpClientConnectionManager.", e);
+	    } catch (KeyManagementException e) {
+	      throw new RuntimeException("Could not initialize HttpClientConnectionManager.", e);
+	    }
+
+	    Registry<ConnectionSocketFactory> registry = RegistryBuilder.<ConnectionSocketFactory>create()
+	        .register("http", new PlainConnectionSocketFactory())
+	        .register("https", factory)
+	        .build();
+
+	    HttpClientConnectionManager httpConnectionManager = new BasicHttpClientConnectionManager(registry);
+	    HttpClientBuilder httpClientBuilder = HttpClients.custom().setConnectionManager(httpConnectionManager)
+	        .setTargetAuthenticationStrategy(new CookieProcessingTargetAuthenticationStrategy());
+	    httpClient = httpClientBuilder.build();
+	  }
+
 
   /**
    * (Re)initializes the HttpContext object. This removes any existing state (mainly cookies). Use an own

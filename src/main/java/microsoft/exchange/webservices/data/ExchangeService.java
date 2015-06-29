@@ -30,6 +30,8 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.*;
 
+import javax.net.ssl.SSLContext;
+
 /**
  * Represents a binding to the Exchange Web Services.
  */
@@ -3665,6 +3667,19 @@ public final class ExchangeService extends ExchangeServiceBase implements
   public ExchangeService(ExchangeVersion requestedServerVersion) {
     super(requestedServerVersion);
   }
+  
+  
+  /**
+   * Initializes a new instance of the <see cref="ExchangeService"/> class,
+   * targeting the specified version of EWS and scoped to the system's current
+   * time zone.
+   *
+   * @param requestedServerVersion the requested server version
+   */
+  public ExchangeService(ExchangeVersion requestedServerVersion,SSLContext sslContext) {
+    super(requestedServerVersion,sslContext);
+  }
+
 
   // Utilities
 
