@@ -26,6 +26,7 @@ package microsoft.exchange.webservices.data;
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 
+import java.net.InetAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.*;
@@ -3676,8 +3677,8 @@ public final class ExchangeService extends ExchangeServiceBase implements
    *
    * @param requestedServerVersion the requested server version
    */
-  public ExchangeService(ExchangeVersion requestedServerVersion,SSLContext sslContext) {
-    super(requestedServerVersion,sslContext);
+  public ExchangeService(ExchangeVersion requestedServerVersion,SSLContext sslContext, InetAddress localAddress) {
+    super(requestedServerVersion,sslContext, localAddress);
   }
 
 

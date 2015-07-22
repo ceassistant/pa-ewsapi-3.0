@@ -39,6 +39,7 @@ import org.apache.http.impl.client.*;
 import org.apache.http.util.EntityUtils;
 
 import java.io.*;
+import java.net.InetAddress;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -58,6 +59,7 @@ class HttpClientWebRequest extends HttpWebRequest {
 
   private final CloseableHttpClient httpClient;
   private final HttpClientContext httpContext;
+  private InetAddress localAddress = null;
 
 
   /**
@@ -66,6 +68,15 @@ class HttpClientWebRequest extends HttpWebRequest {
   public HttpClientWebRequest(CloseableHttpClient httpClient, HttpClientContext httpContext) {
     this.httpClient = httpClient;
     this.httpContext = httpContext;
+  }
+  
+  /**
+   * Instantiates a new http native web request.
+   */
+  public HttpClientWebRequest(CloseableHttpClient httpClient, HttpClientContext httpContext, InetAddress localAddress) {
+    this.httpClient = httpClient;
+    this.httpContext = httpContext;
+    this.localAddress = localAddress;
   }
 
   /**
@@ -147,6 +158,10 @@ class HttpClientWebRequest extends HttpWebRequest {
     }
 
     httpContext.setCredentialsProvider(credentialsProvider);
+    
+    if (this.localAddress != null) {
+    	requestConfigBuilder.setLocalAddress(this.localAddress);
+    }
 
     httpPost.setConfig(requestConfigBuilder.build());
   }

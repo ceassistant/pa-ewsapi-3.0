@@ -24,10 +24,12 @@
 package microsoft.exchange.webservices.data;
 
 import org.apache.http.client.CookieStore;
+import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.protocol.HttpClientContext;
 import org.apache.http.config.Registry;
 import org.apache.http.config.RegistryBuilder;
 import org.apache.http.conn.HttpClientConnectionManager;
+import org.apache.http.conn.params.ConnRoutePNames;
 import org.apache.http.conn.socket.ConnectionSocketFactory;
 import org.apache.http.conn.socket.PlainConnectionSocketFactory;
 import org.apache.http.impl.client.BasicCookieStore;
@@ -44,6 +46,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -141,6 +144,8 @@ public abstract class ExchangeServiceBase implements Closeable {
   protected HttpClientContext httpContext;
 
   protected HttpClientWebRequest request = null;
+  
+  private InetAddress localAddress = null;
 
   // protected static HttpStatusCode AccountIsLocked = (HttpStatusCode)456;
 
@@ -166,23 +171,21 @@ public abstract class ExchangeServiceBase implements Closeable {
     this.requestedServerVersion = requestedServerVersion;
   }
   
- protected ExchangeServiceBase(SSLContext sslContext) {
+ protected ExchangeServiceBase(SSLContext sslContext, InetAddress localAddress) {
+	 	this.localAddress = localAddress;
 		setUseDefaultCredentials(true);
-		if(sslContext!=null){
+		if (sslContext != null) {
 			System.out.println("**using edp keystore**");
-			initializeHttpClient(sslContext);
-			
-		}else{
+			initializeHttpClient(sslContext, localAddress);
+		} else {
 			System.out.println("**using JVM keystore**");
-			initializeHttpClient();	
+			initializeHttpClient(localAddress);
 		}
-		
 		initializeHttpContext();
-
 	}
   
-  protected ExchangeServiceBase(ExchangeVersion requestedServerVersion,SSLContext sslContext) {
-	    this(sslContext);
+  protected ExchangeServiceBase(ExchangeVersion requestedServerVersion,SSLContext sslContext, InetAddress localAddress) {
+	    this(sslContext, localAddress);
 	    this.requestedServerVersion = requestedServerVersion;
 	  }
 
@@ -201,7 +204,7 @@ public abstract class ExchangeServiceBase implements Closeable {
     this.httpHeaders = service.getHttpHeaders();
   }
 
-  private void initializeHttpClient(SSLContext sslContext) {
+  private void initializeHttpClient(SSLContext sslContext, InetAddress localAddress) {
     EwsSSLProtocolSocketFactory factory;
     
     factory = new EwsSSLProtocolSocketFactory(sslContext);
@@ -215,6 +218,9 @@ public abstract class ExchangeServiceBase implements Closeable {
     HttpClientConnectionManager httpConnectionManager = new BasicHttpClientConnectionManager(registry);
     HttpClientBuilder httpClientBuilder = HttpClients.custom().setConnectionManager(httpConnectionManager)
         .setTargetAuthenticationStrategy(new CookieProcessingTargetAuthenticationStrategy());
+    if(localAddress != null) {
+    	httpClientBuilder.setDefaultRequestConfig(RequestConfig.custom().setLocalAddress(localAddress).build());
+    }
     httpClient = httpClientBuilder.build();
   }
   
@@ -238,6 +244,32 @@ public abstract class ExchangeServiceBase implements Closeable {
 	    HttpClientConnectionManager httpConnectionManager = new BasicHttpClientConnectionManager(registry);
 	    HttpClientBuilder httpClientBuilder = HttpClients.custom().setConnectionManager(httpConnectionManager)
 	        .setTargetAuthenticationStrategy(new CookieProcessingTargetAuthenticationStrategy());
+	    httpClient = httpClientBuilder.build();
+	  }
+  
+  private void initializeHttpClient(InetAddress localAddress) {
+	    EwsSSLProtocolSocketFactory factory;
+	    try {
+	      factory = EwsSSLProtocolSocketFactory.build(null);
+	    } catch (NoSuchAlgorithmException e) {
+	      throw new RuntimeException("Could not initialize HttpClientConnectionManager.", e);
+	    } catch (KeyStoreException e) {
+	      throw new RuntimeException("Could not initialize HttpClientConnectionManager.", e);
+	    } catch (KeyManagementException e) {
+	      throw new RuntimeException("Could not initialize HttpClientConnectionManager.", e);
+	    }
+
+	    Registry<ConnectionSocketFactory> registry = RegistryBuilder.<ConnectionSocketFactory>create()
+	        .register("http", new PlainConnectionSocketFactory())
+	        .register("https", factory)
+	        .build();
+
+	    HttpClientConnectionManager httpConnectionManager = new BasicHttpClientConnectionManager(registry);
+	    HttpClientBuilder httpClientBuilder = HttpClients.custom().setConnectionManager(httpConnectionManager)
+	        .setTargetAuthenticationStrategy(new CookieProcessingTargetAuthenticationStrategy());
+	    if(localAddress != null) {
+	    	httpClientBuilder.setDefaultRequestConfig(RequestConfig.custom().setLocalAddress(localAddress).build());
+	    }
 	    httpClient = httpClientBuilder.build();
 	  }
 
@@ -302,7 +334,7 @@ public abstract class ExchangeServiceBase implements Closeable {
       throw new ServiceLocalException(strErr);
     }
 
-    request = new HttpClientWebRequest(httpClient, httpContext);
+    request = new HttpClientWebRequest(httpClient, httpContext, localAddress);
     try {
       request.setUrl(url.toURL());
     } catch (MalformedURLException e) {
